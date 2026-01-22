@@ -1,6 +1,6 @@
 ip:
-    frontend: 0.0.0.0        # Reemplazar por la IP del servidor web Apache
-    backend: 0.0.0.0         # Reemplazar por la IP del servidor de MySQL
+    frontend: 18.234.171.122       # Reemplazar por la IP del servidor web Apache
+    backend: 18.234.146.46         # Reemplazar por la IP del servidor de MySQL
 
 db:
     name: wordpress_db
