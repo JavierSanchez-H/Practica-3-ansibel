@@ -1,0 +1,101 @@
+- hosts: frontend
+  become: yes
+  vars_files:
+    - ../variables.yml
+
+  tasks:
+
+    # ---------------- SISTEMA ----------------
+    - name: Actualizar sistema
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    # ---------------- APACHE + PHP ----------------
+    - name: Instalar Apache y PHP
+      apt:
+        name:
+          - apache2
+          - php
+          - php-mysql
+          - php-xml
+          - php-gd
+          - php-curl
+          - php-zip
+          - php-mbstring
+          - php-intl
+          - unzip
+        state: present
+
+    - name: Habilitar Apache
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Activar mod_rewrite
+      apache2_module:
+        name: rewrite
+        state: present
+
+    # ---------------- APACHE VHOST ----------------
+    - name: Configurar VirtualHost
+      copy:
+        dest: /etc/apache2/sites-available/000-default.conf
+        content: |
+          <VirtualHost *:80>
+            ServerName {{ dominio }}
+            DocumentRoot {{ web_dir }}
+
+            <Directory {{ web_dir }}>
+              AllowOverride All
+              Require all granted
+            </Directory>
+
+            ErrorLog ${APACHE_LOG_DIR}/error.log
+            CustomLog ${APACHE_LOG_DIR}/access.log combined
+          </VirtualHost>
+
+    - name: Reiniciar Apache (VHost)
+      service:
+        name: apache2
+        state: restarted
+
+    # ---------------- LIMPIEZA TOTAL MOODLE ----------------
+    - name: Eliminar Moodle anterior
+      file:
+        path: "{{ web_dir }}"
+        state: absent
+
+    - name: Eliminar moodledata anterior
+      file:
+        path: "{{ moodledata_dir }}"
+        state: absent
+
+    # ---------------- DESCARGA MOODLE ----------------
+    - name: Descargar Moodle
+      get_url:
+        url: https://download.moodle.org/download.php/direct/stable401/moodle-latest-401.tgz
+        dest: /tmp/moodle.tgz
+        timeout: 300
+
+    - name: Descomprimir Moodle
+      unarchive:
+        src: /tmp/moodle.tgz
+        dest: /var/www/html/
+        remote_src: yes
+
+    - name: Crear moodledata
+      file:
+        path: "{{ moodledata_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0777"
+
+    - name: Permisos Moodle
+      file:
+        path: "{{ web_dir }}"
+        owner: www-data
+        group: www-data
+        recurse: yes

@@ -1,0 +1,61 @@
+- hosts: frontend
+  become: yes
+  vars_files:
+    - ../variables.yml
+
+  tasks:
+
+    # ---------------- HTTPS ----------------
+    - name: Instalar Certbot
+      apt:
+        name:
+          - certbot
+          - python3-certbot-apache
+        state: present
+
+    - name: Asegurar ServerName global
+      lineinfile:
+        path: /etc/apache2/apache2.conf
+        line: "ServerName {{ dominio }}"
+        create: yes
+
+    - name: Obtener certificado SSL
+      command: >
+        certbot --apache
+        --non-interactive
+        --agree-tos
+        -m {{ email_certbot }}
+        -d {{ dominio }}
+      args:
+        creates: /etc/letsencrypt/live/{{ dominio }}/fullchain.pem
+
+    - name: Reiniciar Apache tras HTTPS
+      service:
+        name: apache2
+        state: restarted
+
+    # ---------------- AJUSTAR HTTPS ----------------
+    - name: Forzar wwwroot a https
+      replace:
+        path: "{{ web_dir }}/config.php"
+        regexp: "http://{{ dominio }}"
+        replace: "https://{{ dominio }}"
+
+    - name: Permisos finales Moodle y moodledata
+      file:
+        path: "{{ item }}"
+        owner: www-data
+        group: www-data
+        mode: "0777"
+        recurse: yes
+      loop:
+        - "{{ web_dir }}"
+        - "{{ moodledata_dir }}"
+
+    - name: Limpiar cache de Moodle (CLI oficial)
+      command: php {{ web_dir }}/admin/cli/purge_caches.php
+
+    - name: Reinicio final Apache
+      service:
+        name: apache2
+        state: restarted

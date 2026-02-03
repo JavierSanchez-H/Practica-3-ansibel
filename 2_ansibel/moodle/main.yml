@@ -1,0 +1,5 @@
+---
+- import_playbook: playbooks/install-lamp-frontend.yml
+- import_playbook: playbooks/backend.yml
+- import_playbook: playbooks/cerbot.yml
+- import_playbook: playbooks/deploy-moddle.yml

@@ -1,0 +1,27 @@
+- hosts: frontend
+  become: yes
+  vars_files:
+    - ../variables.yml
+
+  tasks:
+
+    # ---------------- INSTALACIÓN MOODLE ----------------
+    - name: Instalar Moodle por CLI
+      command: >
+        php {{ web_dir }}/admin/cli/install.php
+        --lang=es
+        --wwwroot=http://{{ dominio }}
+        --dataroot={{ moodledata_dir }}
+        --dbtype=mysqli
+        --dbhost={{ backend_private_ip }}
+        --dbname={{ db_name }}
+        --dbuser={{ db_user }}
+        --dbpass={{ db_pass }}
+        --fullname="Moodle ASIR"
+        --shortname="ASIR"
+        --adminuser={{ admin_user }}
+        --adminpass={{ admin_pass }}
+        --agree-license
+        --non-interactive
+      args:
+        creates: "{{ web_dir }}/config.php"

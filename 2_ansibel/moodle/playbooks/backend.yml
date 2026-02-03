@@ -1,0 +1,51 @@
+---
+- name: Configurar backend MySQL
+  hosts: backend
+  become: yes
+  vars_files:
+    - ../variables.yml
+
+  tasks:
+
+    - name: Actualizar repositorios
+      apt:
+        update_cache: yes
+
+    - name: Instalar MySQL
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Asegurar que MySQL está iniciado
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Configurar MySQL para aceptar conexiones remotas
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+      notify: Reiniciar MySQL
+
+    - name: Crear base de datos Moodle
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Crear usuario de base de datos
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        host: '%'
+        priv: "{{ db_name }}.*:ALL"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+  handlers:
+    - name: Reiniciar MySQL
+      service:
+        name: mysql
+        state: restarted
