@@ -1,11 +1,24 @@
-- hosts: frontend
+---
+- name: Instalar Moodle mediante CLI
+  hosts: frontend
   become: yes
   vars_files:
     - ../variables.yml
 
   tasks:
 
-    # ---------------- INSTALACIÓN MOODLE ----------------
+    # ---------------- VERIFICAR QUE MOODLE EXISTE ----------------
+    - name: Verificar que el instalador CLI existe
+      stat:
+        path: "{{ web_dir }}/admin/cli/install.php"
+      register: moodle_cli
+
+    - name: Fallar si Moodle no está descargado
+      fail:
+        msg: "Moodle no está descargado. Ejecuta primero el playbook del frontend."
+      when: not moodle_cli.stat.exists
+
+    # ---------------- INSTALACIÓN CLI ----------------
     - name: Instalar Moodle por CLI
       command: >
         php {{ web_dir }}/admin/cli/install.php
@@ -25,3 +38,30 @@
         --non-interactive
       args:
         creates: "{{ web_dir }}/config.php"
+
+    # ---------------- PERMISOS ----------------
+    - name: Ajustar permisos finales de Moodle
+      file:
+        path: "{{ web_dir }}"
+        owner: www-data
+        group: www-data
+        mode: "0755"
+        recurse: yes
+
+    - name: Ajustar permisos de moodledata
+      file:
+        path: "{{ moodledata_dir }}"
+        owner: www-data
+        group: www-data
+        mode: "0770"
+        recurse: yes
+
+    # ---------------- PURGA DE CACHÉ ----------------
+    - name: Limpiar caché de Moodle
+      command: php {{ web_dir }}/admin/cli/purge_caches.php
+      ignore_errors: yes
+
+    - name: Reiniciar Apache
+      service:
+        name: apache2
+        state: restarted

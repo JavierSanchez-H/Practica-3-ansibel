@@ -11,9 +11,14 @@
       apt:
         update_cache: yes
 
-    - name: Instalar MySQL
+    - name: Instalar MySQL Server
       apt:
         name: mysql-server
+        state: present
+
+    - name: Instalar driver Python para MySQL (OBLIGATORIO)
+      apt:
+        name: python3-pymysql
         state: present
 
     - name: Asegurar que MySQL está iniciado
@@ -22,7 +27,7 @@
         state: started
         enabled: yes
 
-    - name: Configurar MySQL para aceptar conexiones remotas
+    - name: Permitir conexiones remotas
       lineinfile:
         path: /etc/mysql/mysql.conf.d/mysqld.cnf
         regexp: '^bind-address'
@@ -35,11 +40,11 @@
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock
 
-    - name: Crear usuario de base de datos
+    - name: Crear usuario Moodle
       community.mysql.mysql_user:
         name: "{{ db_user }}"
         password: "{{ db_pass }}"
-        host: '%'
+        host: "%"
         priv: "{{ db_name }}.*:ALL"
         state: present
         login_unix_socket: /var/run/mysqld/mysqld.sock

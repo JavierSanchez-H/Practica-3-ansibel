@@ -1,4 +1,6 @@
-- hosts: frontend
+---
+- name: Configurar frontend Apache + PHP para Moodle
+  hosts: frontend
   become: yes
   vars_files:
     - ../variables.yml
@@ -12,7 +14,7 @@
         upgrade: yes
 
     # ---------------- APACHE + PHP ----------------
-    - name: Instalar Apache y PHP
+    - name: Instalar Apache y PHP con módulos necesarios
       apt:
         name:
           - apache2
@@ -24,10 +26,12 @@
           - php-zip
           - php-mbstring
           - php-intl
+          - php-soap
+          - php-opcache
           - unzip
         state: present
 
-    - name: Habilitar Apache
+    - name: Asegurar que Apache está iniciado
       service:
         name: apache2
         state: started
@@ -38,8 +42,49 @@
         name: rewrite
         state: present
 
+    # ---------------- CONFIGURACIÓN PHP (CLI + Apache) ----------------
+    - name: Asegurar max_input_vars = 5000 en PHP CLI
+      lineinfile:
+        path: /etc/php/8.1/cli/php.ini
+        regexp: '^max_input_vars'
+        line: 'max_input_vars = 5000'
+        insertafter: EOF
+
+    - name: Asegurar max_input_vars = 5000 en PHP Apache
+      lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^max_input_vars'
+        line: 'max_input_vars = 5000'
+        insertafter: EOF
+
+    - name: Aumentar memory_limit a 256M en PHP Apache
+      lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^memory_limit'
+        line: 'memory_limit = 256M'
+        insertafter: EOF
+
+    - name: Aumentar upload_max_filesize a 50M en PHP Apache
+      lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^upload_max_filesize'
+        line: 'upload_max_filesize = 50M'
+        insertafter: EOF
+
+    - name: Aumentar post_max_size a 50M en PHP Apache
+      lineinfile:
+        path: /etc/php/8.1/apache2/php.ini
+        regexp: '^post_max_size'
+        line: 'post_max_size = 50M'
+        insertafter: EOF
+
+    - name: Reiniciar Apache tras cambiar php.ini
+      service:
+        name: apache2
+        state: restarted
+
     # ---------------- APACHE VHOST ----------------
-    - name: Configurar VirtualHost
+    - name: Configurar VirtualHost para Moodle
       copy:
         dest: /etc/apache2/sites-available/000-default.conf
         content: |
@@ -56,18 +101,18 @@
             CustomLog ${APACHE_LOG_DIR}/access.log combined
           </VirtualHost>
 
-    - name: Reiniciar Apache (VHost)
+    - name: Reiniciar Apache tras configurar VHost
       service:
         name: apache2
         state: restarted
 
     # ---------------- LIMPIEZA TOTAL MOODLE ----------------
-    - name: Eliminar Moodle anterior
+    - name: Eliminar instalación previa de Moodle
       file:
         path: "{{ web_dir }}"
         state: absent
 
-    - name: Eliminar moodledata anterior
+    - name: Eliminar moodledata previo
       file:
         path: "{{ moodledata_dir }}"
         state: absent
@@ -79,23 +124,26 @@
         dest: /tmp/moodle.tgz
         timeout: 300
 
-    - name: Descomprimir Moodle
+    - name: Descomprimir Moodle en /var/www/html
       unarchive:
         src: /tmp/moodle.tgz
         dest: /var/www/html/
         remote_src: yes
 
-    - name: Crear moodledata
+    # ---------------- MOODLEDATA ----------------
+    - name: Crear directorio moodledata
       file:
         path: "{{ moodledata_dir }}"
         state: directory
         owner: www-data
         group: www-data
-        mode: "0777"
+        mode: "0770"
 
-    - name: Permisos Moodle
+    # ---------------- PERMISOS ----------------
+    - name: Ajustar permisos de Moodle
       file:
         path: "{{ web_dir }}"
         owner: www-data
         group: www-data
+        mode: "0755"
         recurse: yes

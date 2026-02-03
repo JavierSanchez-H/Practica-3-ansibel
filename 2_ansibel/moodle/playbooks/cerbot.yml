@@ -1,25 +1,28 @@
-- hosts: frontend
+---
+- name: Configurar HTTPS con Certbot para Moodle
+  hosts: frontend
   become: yes
   vars_files:
     - ../variables.yml
 
   tasks:
 
-    # ---------------- HTTPS ----------------
-    - name: Instalar Certbot
+    # ---------------- CERTBOT ----------------
+    - name: Instalar Certbot y plugin Apache
       apt:
         name:
           - certbot
           - python3-certbot-apache
         state: present
+        update_cache: yes
 
-    - name: Asegurar ServerName global
+    - name: Asegurar ServerName global en Apache
       lineinfile:
         path: /etc/apache2/apache2.conf
         line: "ServerName {{ dominio }}"
         create: yes
 
-    - name: Obtener certificado SSL
+    - name: Obtener certificado SSL con Certbot
       command: >
         certbot --apache
         --non-interactive
@@ -29,33 +32,37 @@
       args:
         creates: /etc/letsencrypt/live/{{ dominio }}/fullchain.pem
 
-    - name: Reiniciar Apache tras HTTPS
+    - name: Reiniciar Apache tras obtener certificado
       service:
         name: apache2
         state: restarted
 
-    # ---------------- AJUSTAR HTTPS ----------------
-    - name: Forzar wwwroot a https
+    # ---------------- AJUSTAR HTTPS EN MOODLE ----------------
+    - name: Forzar wwwroot a https en config.php
       replace:
         path: "{{ web_dir }}/config.php"
         regexp: "http://{{ dominio }}"
         replace: "https://{{ dominio }}"
+      when: ansible_facts['files'][web_dir + '/config.php'] is defined
 
-    - name: Permisos finales Moodle y moodledata
+    # ---------------- PERMISOS ----------------
+    - name: Ajustar permisos finales de Moodle y moodledata
       file:
-        path: "{{ item }}"
+        path: "{{ item.path }}"
         owner: www-data
         group: www-data
-        mode: "0777"
+        mode: "{{ item.mode }}"
         recurse: yes
       loop:
-        - "{{ web_dir }}"
-        - "{{ moodledata_dir }}"
+        - { path: "{{ web_dir }}", mode: "0755" }
+        - { path: "{{ moodledata_dir }}", mode: "0770" }
 
-    - name: Limpiar cache de Moodle (CLI oficial)
+    # ---------------- PURGA DE CACHÉ ----------------
+    - name: Limpiar caché de Moodle
       command: php {{ web_dir }}/admin/cli/purge_caches.php
+      ignore_errors: yes
 
-    - name: Reinicio final Apache
+    - name: Reinicio final de Apache
       service:
         name: apache2
         state: restarted

@@ -2,7 +2,7 @@
 44.212.191.115
 
 [backend]
-54.242.205.91
+54.242.205.91 ansible_python_interpreter=/usr/bin/python3
 
 [all:vars]
 ansible_user=ubuntu
